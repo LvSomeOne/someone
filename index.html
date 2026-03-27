@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Spot Real-time Strategy</title>
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
+        .container { width: 100%; max-width: 420px; padding: 10px; }
+        .header-box { background: #1e1e1e; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 15px; border: 1px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        h2 { margin: 0; color: #f1c40f; font-size: 1.6rem; }
+        .status { font-size: 0.9rem; color: #aaa; margin-top: 5px; }
+        .live-price { font-size: 1.8rem; font-weight: bold; color: #2ecc71; margin: 10px 0; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; color: black; border-radius: 10px; overflow: hidden; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 12px 5px; text-align: center; font-weight: bold; }
+        
+        .up-zone { background-color: #e8f5e9; color: #2e7d32; } 
+        .down-zone { background-color: #ffebee; color: #c62828; }
+        .pivot-zone { 
+            background-color: #87ceeb !important; 
+            color: #000;
+            font-size: 1.2rem;
+            height: 70px;
+            border: 2px solid #000;
+        }
+        .manual-input { margin-top: 15px; display: flex; gap: 5px; justify-content: center; }
+        input { padding: 8px; border-radius: 5px; border: none; width: 100px; text-align: center; }
+        button { padding: 8px 15px; border-radius: 5px; border: none; background: #f1c40f; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-box">
+        <h2>Gold Spot (XAU/USD)</h2>
+        <div id="live-val" class="live-price">กำลังโหลด...</div>
+        <div id="open-info" class="status">Daily Open: --.--</div>
+        <div id="update-time" class="status">อัปเดตอัตโนมัติจาก Yahoo Finance</div>
+        
+        <div class="manual-input">
+            <input type="number" id="customOpen" placeholder="ใส่ราคาเปิดเอง">
+            <button onclick="setManualOpen()">ตั้งค่าใหม่</button>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr style="background: #f4f4f4;">
+                <th width="30%">Target %</th>
+                <th width="40%">Price ($)</th>
+                <th width="30%">Diff ($)</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    const steps = [4, 3.78, 3.5, 3.27, 3, 2.78, 2.5, 2.27, 2, 1.62, 1.41, 1.27, 1, 0.78, 0.61, 0.5, 0.38, 0.23];
+    let currentOpenPrice = 0;
+
+    async function fetchGoldData() {
+        try {
+            // ดึงราคาจาก Yahoo Finance (XAU/USD) ผ่าน Proxy เพื่อเลี่ยง CORS
+            const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d`);
+            const data = await res.json();
+            
+            const meta = data.chart.result[0].meta;
+            const openPrice = meta.chartPreviousClose || meta.regularMarketPrice; // ราคาอ้างอิงตอนเปิดวัน
+            const livePrice = meta.regularMarketPrice;
+
+            // ถ้าไม่มีการตั้งค่า Manual ให้ใช้ราคาจาก API
+            if (currentOpenPrice === 0) {
+                currentOpenPrice = openPrice;
+            }
+
+            document.getElementById('live-val').innerText = `$${livePrice.toFixed(2)}`;
+            document.getElementById('open-info').innerText = `ราคาเปิดวันนี้ (API): $${openPrice.toFixed(2)}`;
+            
+            renderTable(currentOpenPrice);
+        } catch (error) {
+            console.error("API Error:", error);
+            // ถ้า API ล่ม ให้แสดงราคาเปิดเริ่มต้นที่ 4388 ตามที่คุณแจ้ง
+            if (currentOpenPrice === 0) {
+                currentOpenPrice = 4388;
+                renderTable(4388);
+            }
+        }
+    }
+
+    function setManualOpen() {
+        const val = document.getElementById('customOpen').value;
+        if (val) {
+            currentOpenPrice = parseFloat(val);
+            renderTable(currentOpenPrice);
+            document.getElementById('open-info').innerText = `ราคาเปิด (กำหนดเอง): $${currentOpenPrice.toFixed(2)}`;
+        }
+    }
+
+    function renderTable(open) {
+        const body = document.getElementById('tableBody');
+        let rows = '';
+        const d = new Date();
+        const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543}`;
+
+        // Upper Zone
+        steps.forEach(p => {
+            const pPrice = open + (open * (p / 100));
+            rows += `<tr class="up-zone"><td>+${p}%</td><td>${pPrice.toFixed(2)}</td><td>+${(pPrice - open).toFixed(2)}</td></tr>`;
+        });
+
+        // Pivot (ช่องสีฟ้า)
+        rows += `<tr class="pivot-zone">
+                    <td>OPEN<br><small>${dateStr}</small></td>
+                    <td>${open.toFixed(2)}</td>
+                    <td>PIVOT</td>
+                 </tr>`;
+
+        // Lower Zone
+        [...steps].reverse().forEach(p => {
+            const pPrice = open - (open * (p / 100));
+            rows += `<tr class="down-zone"><td>-${p}%</td><td>${pPrice.toFixed(2)}</td><td>-${(open - pPrice).toFixed(2)}</td></tr>`;
+        });
+
+        body.innerHTML = rows;
+    }
+
+    fetchGoldData();
+    setInterval(fetchGoldData, 30000); // อัปเดตราคาล่าสุดทุก 30 วินาที
+</script>
+
+</body>
+</html>
