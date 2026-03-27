@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Precision Calculator</title>
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #1a1a1b; color: white; display: flex; flex-direction: column; align-items: center; padding: 15px; margin: 0; }
+        .app-container { width: 100%; max-width: 420px; }
+        
+        .setup-box { background: #2d2d2e; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #444; margin-bottom: 15px; }
+        .live-price { font-size: 2rem; font-weight: bold; color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.3); }
+        
+        .input-group { margin-top: 15px; background: #3d3d3e; padding: 10px; border-radius: 8px; }
+        .input-group label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 5px; }
+        input { width: 80%; padding: 12px; border-radius: 5px; border: none; background: #fff; color: #000; font-size: 1.2rem; text-align: center; font-weight: bold; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; color: black; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        th, td { border: 1px solid #ccc; padding: 12px 5px; text-align: center; font-weight: bold; }
+        
+        .up-zone { background-color: #d1e7dd; color: #0f5132; } 
+        .down-zone { background-color: #f8d7da; color: #842029; }
+        .pivot-zone { background-color: #87ceeb !important; color: #000; font-size: 1.3rem; height: 70px; border: 3px solid #000; }
+        
+        .points-col { font-size: 0.8rem; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="setup-box">
+        <div style="font-size: 0.9rem; color: #f1c40f;">LIVE XAU/USD</div>
+        <div id="live-val" class="live-price">---.--</div>
+        
+        <div class="input-group">
+            <label>กรอกราคาเปิด (Open) ที่คุณต้องการคำนวณ:</label>
+            <input type="number" id="openInput" value="4388" oninput="calculateTable()">
+            <div style="font-size: 0.7rem; color: #87ceeb; margin-top: 5px;">* ตารางจะอัปเดตทันทีเมื่อคุณเปลี่ยนตัวเลขนี้</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr style="background: #eee;">
+                <th>Target %</th>
+                <th>Price ($)</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    const steps = [4, 3.78, 3.5, 3.27, 3, 2.78, 2.5, 2.27, 2, 1.62, 1.41, 1.27, 1, 0.78, 0.61, 0.5, 0.38, 0.23];
+
+    // ฟังก์ชันดึงราคาล่าสุด (เพื่อให้เห็นว่าตอนนี้ราคาอยู่ที่เท่าไหร่)
+    async function updateLivePrice() {
+        try {
+            // ดึงจาก Binance เป็นตัวอ้างอิงราคาปัจจุบัน (ตัวเลขจะวิ่งตลอด)
+            const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT');
+            const data = await res.json();
+            document.getElementById('live-val').innerText = `$${parseFloat(data.price).toFixed(2)}`;
+        } catch (e) {
+            console.log("Live price fetch failed");
+        }
+    }
+
+    // ฟังก์ชันคำนวณตารางตามราคาเปิดที่ระบุ
+    function calculateTable() {
+        const open = parseFloat(document.getElementById('openInput').value);
+        if (isNaN(open)) return;
+
+        const body = document.getElementById('tableBody');
+        let html = '';
+        const dateStr = new Date().toLocaleDateString('th-TH');
+
+        // โซนบวก (+)
+        steps.forEach(p => {
+            const pPrice = open + (open * (p / 100));
+            html += `<tr class="up-zone">
+                <td>+${p}%</td>
+                <td>${pPrice.toFixed(2)}</td>
+                <td class="points-col">+${(pPrice - open).toFixed(2)}</td>
+            </tr>`;
+        });
+
+        // ช่องสีฟ้า (ราคาเปิด)
+        html += `<tr class="pivot-zone">
+            <td>${dateStr}</td>
+            <td>${open.toFixed(2)}</td>
+            <td>OPEN</td>
+        </tr>`;
+
+        // โซนลบ (-)
+        [...steps].reverse().forEach(p => {
+            const pPrice = open - (open * (p / 100));
+            html += `<tr class="down-zone">
+                <td>-${p}%</td>
+                <td>${pPrice.toFixed(2)}</td>
+                <td class="points-col">-${(open - pPrice).toFixed(2)}</td>
+            </tr>`;
+        });
+
+        body.innerHTML = html;
+    }
+
+    // เริ่มทำงาน
+    updateLivePrice();
+    setInterval(updateLivePrice, 5000); // อัปเดตราคา Live ทุก 5 วินาที
+    calculateTable(); // คำนวณตารางครั้งแรก
+</script>
+
+</body>
+</html>
