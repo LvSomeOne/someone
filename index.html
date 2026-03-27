@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Spot Daily Range</title>
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        .card { background: #2d2d2d; padding: 15px; border-radius: 10px; width: 100%; max-width: 380px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { text-align: center; color: #f1c40f; margin-bottom: 5px; }
+        .info { text-align: center; margin-bottom: 15px; font-size: 0.9rem; color: #bbb; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; color: black; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #444; padding: 10px 5px; text-align: center; font-weight: bold; }
+        
+        /* แถบสีตามคำขอ */
+        .up-zone { background-color: #d4edda; }    /* เขียว */
+        .down-zone { background-color: #f8d7da; }  /* แดง */
+        .pivot-zone { 
+            background-color: #87ceeb !important; 
+            color: black; 
+            font-size: 1.2rem;
+            border: 2px solid #000;
+        }
+        
+        .live-tag { color: #2ecc71; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>XAU/USD Range</h2>
+    <div class="info">
+        ราคาเปิดวันนี้: <span id="open-val" style="color: #87ceeb;">กำลังโหลด...</span><br>
+        <span class="live-tag">●</span> ราคา Real-time: <span id="current-val">--.--</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr style="background: #eee;">
+                <th>Target %</th>
+                <th>Price ($)</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    // เปอร์เซ็นต์อ้างอิงจากรูปภาพ
+    const steps = [4, 3.78, 3.5, 3.27, 3, 2.78, 2.5, 2.27, 2, 1.62, 1.41, 1.27, 1, 0.78, 0.61, 0.5, 0.38, 0.23];
+
+    async function getGoldSpotPrice() {
+        try {
+            // ดึงข้อมูลจาก Binance API (PAXG/USDT คือราคาทองคำ Spot)
+            const response = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT');
+            const data = await response.json();
+            
+            // ราคาเปิดของแท่งวัน (เริ่มนับจาก 00:00 UTC)
+            const openPrice = parseFloat(data.openPrice); 
+            const lastPrice = parseFloat(data.lastPrice);
+
+            document.getElementById('open-val').innerText = `$${openPrice.toFixed(2)}`;
+            document.getElementById('current-val').innerText = `$${lastPrice.toFixed(2)}`;
+
+            updateTable(openPrice);
+        } catch (err) {
+            console.error("Fetch Error:", err);
+            document.getElementById('open-val').innerText = "Error API";
+        }
+    }
+
+    function updateTable(open) {
+        const body = document.getElementById('tableBody');
+        let html = '';
+
+        // โซนด้านบน (+%)
+        steps.forEach(p => {
+            const pPrice = open + (open * (p / 100));
+            const diff = pPrice - open;
+            html += `<tr class="up-zone"><td>+${p}%</td><td>${pPrice.toFixed(2)}</td><td>+${diff.toFixed(2)}</td></tr>`;
+        });
+
+        // ช่องสีฟ้า (ราคาเปิดตลาด)
+        const d = new Date();
+        const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543}`;
+        html += `<tr class="pivot-zone">
+                    <td>OPEN<br><small>${dateStr}</small></td>
+                    <td>${open.toFixed(2)}</td>
+                    <td>PIVOT</td>
+                 </tr>`;
+
+        // โซนด้านล่าง (-%)
+        [...steps].reverse().forEach(p => {
+            const pPrice = open - (open * (p / 100));
+            const diff = open - pPrice;
+            html += `<tr class="down-zone"><td>-${p}%</td><td>${pPrice.toFixed(2)}</td><td>-${diff.toFixed(2)}</td></tr>`;
+        });
+
+        body.innerHTML = html;
+    }
+
+    // ทำงานทันทีและอัปเดตทุก 1 นาที
+    getGoldSpotPrice();
+    setInterval(getGoldSpotPrice, 60000);
+</script>
+
+</body>
+</html>
